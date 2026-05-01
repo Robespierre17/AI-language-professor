@@ -7,11 +7,14 @@ Session object and exposed to Claude via a set_target_language tool.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
 import wave
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import anthropic
 import numpy as np
@@ -26,14 +29,19 @@ load_dotenv()
 SAMPLE_RATE = 16_000
 CHANNELS = 1
 SILENCE_RMS = 350           # int16 RMS below this counts as silence
-SILENCE_DURATION = 1.4      # seconds of silence after speech that ends a turn
+SILENCE_DURATION = 0.8      # seconds of silence after speech that ends a turn
 MIN_SPEECH_DURATION = 0.4   # ignore silence until this much speech is heard
 MAX_TURN_SECONDS = 60
 
-CLAUDE_MODEL = "claude-opus-4-7"
+CLAUDE_MODEL = "claude-sonnet-4-5"
+EXTRACTOR_MODEL = "claude-haiku-4-5-20251001"
 WHISPER_MODEL = "whisper-1"
 TTS_MODEL = "eleven_multilingual_v2"
 DEFAULT_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL")  # Sarah
+
+MEMORY_PATH = Path(__file__).parent / "memory.json"
+VOCAB_SUMMARY_LIMIT = 30
+MISTAKE_SUMMARY_LIMIT = 10
 
 SUPPORTED_LANGUAGES = {
     "es": "Spanish",
@@ -80,26 +88,42 @@ def looks_like_switch_request(text: str) -> bool:
     return any(phrase in lowered for phrase in SWITCH_PHRASE_HINTS)
 
 
-def print_all_voices(eleven_client: ElevenLabs) -> None:
-    """Dump every available ElevenLabs voice with full metadata."""
-    try:
-        voices = list(eleven_client.voices.get_all().voices)
-    except Exception as e:  # noqa: BLE001 — boundary call, surface and continue
-        print(f"⚠️  could not list ElevenLabs voices: {e}", file=sys.stderr)
-        return
-
-    print(f"\n=== {len(voices)} ElevenLabs voices ===\n", flush=True)
-    for v in voices:
-        print(f"id:          {getattr(v, 'voice_id', '')}")
-        print(f"name:        {getattr(v, 'name', '')}")
-        print(f"category:    {getattr(v, 'category', '')}")
-        print(f"labels:      {getattr(v, 'labels', None)}")
-        print(f"description: {getattr(v, 'description', '')}")
-        print(flush=True)
+SENT_END_CHARS = set(".!?。！？؟")
 
 
-# Hardcoded voice IDs per language. Fill in after reading the voice dump
-# printed at startup. Languages left out fall back to DEFAULT_VOICE_ID.
+def _split_sentence(buf: str) -> tuple[str | None, str]:
+    """Pull the first complete sentence out of `buf`. Returns (sentence, rest)
+    or (None, buf) if no boundary yet. Newlines split. Other terminators only
+    split when followed by whitespace, so '3.14' and 'wait...' aren't broken
+    up while they're still streaming in.
+    """
+    i = 0
+    while i < len(buf):
+        ch = buf[i]
+        if ch == "\n":
+            sentence = buf[:i].strip()
+            rest = buf[i + 1:].lstrip()
+            if sentence:
+                return sentence, rest
+            i += 1
+        elif ch in SENT_END_CHARS:
+            j = i
+            while j + 1 < len(buf) and buf[j + 1] in SENT_END_CHARS:
+                j += 1
+            if j + 1 >= len(buf):
+                return None, buf
+            if buf[j + 1].isspace():
+                sentence = buf[:j + 1].strip()
+                rest = buf[j + 1:].lstrip()
+                if sentence:
+                    return sentence, rest
+            i = j + 1
+        else:
+            i += 1
+    return None, buf
+
+
+# Hardcoded voice IDs per language. Languages left out fall back to DEFAULT_VOICE_ID.
 VOICE_MAP: dict[str, str] = {
     # "es": "",
     # "fr": "",
@@ -111,7 +135,67 @@ VOICE_MAP: dict[str, str] = {
     # "sv": "",
 }
 
-SYSTEM_PROMPT = f"""You are an adaptive language tutor in a real-time spoken conversation with a learner.
+def load_memory() -> dict:
+    """Read memory.json. Empty dict on first run or unreadable file (preserves
+    the existing file on parse error so corrupted state isn't silently overwritten
+    until the next save)."""
+    if not MEMORY_PATH.exists():
+        return {}
+    try:
+        return json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"⚠️  could not read {MEMORY_PATH.name}: {e}", file=sys.stderr)
+        return {}
+
+
+def save_memory(memory: dict) -> None:
+    MEMORY_PATH.write_text(
+        json.dumps(memory, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def memory_slot(memory: dict, code: str) -> dict:
+    return memory.setdefault(code, {"vocab": [], "mistakes": [], "preferences": []})
+
+
+def format_memory_summary(memory: dict) -> str:
+    """Render stored memory as a compact section to append to the system prompt."""
+    if not memory:
+        return ""
+    lines = [
+        "Prior-session memory for this learner. Honor preferences strictly; "
+        "reinforce past vocab and corrections naturally without re-teaching what "
+        "the learner already knows."
+    ]
+    for code in sorted(memory.keys()):
+        slot = memory[code]
+        prefs = slot.get("preferences", [])
+        vocab = slot.get("vocab", [])
+        mistakes = slot.get("mistakes", [])
+        if not (prefs or vocab or mistakes):
+            continue
+        name = SUPPORTED_LANGUAGES.get(code, code)
+        lines.append(f"\n[{name}]")
+        if prefs:
+            lines.append("Preferences (always honor):")
+            for p in prefs:
+                lines.append(f"- {p}")
+        if vocab:
+            recent = vocab[-VOCAB_SUMMARY_LIMIT:]
+            words = ", ".join(v.get("word", "") for v in recent if v.get("word"))
+            if words:
+                lines.append(f"Vocab already taught (recent): {words}")
+        if mistakes:
+            recent = mistakes[-MISTAKE_SUMMARY_LIMIT:]
+            lines.append("Past corrections to reinforce:")
+            for m in recent:
+                d, c = m.get("description", ""), m.get("correction", "")
+                if d and c:
+                    lines.append(f"- {d} → {c}")
+    return "\n".join(lines)
+
+
+SYSTEM_PROMPT_BASE = f"""You are an adaptive language tutor in a real-time spoken conversation with a learner.
 
 The only supported target languages are: {SUPPORTED_LIST}. Never switch to anything else.
 
@@ -133,6 +217,11 @@ Switching rules — read carefully:
 After a successful switch, continue naturally in the new language with a short greeting that confirms the switch and invites a first exchange.
 
 This is spoken conversation. Keep replies short — usually 2 to 4 sentences. No bullet points, no code blocks, no markdown. Speak like a friend tutoring you over coffee."""
+
+
+def build_system_prompt(memory: dict) -> str:
+    summary = format_memory_summary(memory)
+    return f"{SYSTEM_PROMPT_BASE}\n\n{summary}" if summary else SYSTEM_PROMPT_BASE
 
 SET_LANGUAGE_TOOL = {
     "name": "set_target_language",
@@ -160,12 +249,95 @@ SET_LANGUAGE_TOOL = {
     },
 }
 
+REMEMBER_VOCAB_TOOL = {
+    "name": "remember_vocabulary",
+    "description": (
+        "Record new vocabulary the tutor introduced this turn that the learner "
+        "should retain. Stored under the current target language. Skip words "
+        "used only in passing or already in prior-session memory."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "words": {
+                "type": "array",
+                "description": "One or more new words/phrases just introduced.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "word": {"type": "string", "description": "Word or phrase in the target language."},
+                        "translation": {"type": "string", "description": "Brief English gloss."},
+                        "note": {"type": "string", "description": "Optional usage note or example."},
+                    },
+                    "required": ["word", "translation"],
+                },
+            },
+        },
+        "required": ["words"],
+    },
+}
+
+REMEMBER_PREFERENCE_TOOL = {
+    "name": "remember_preference",
+    "description": (
+        "Record a teaching-style preference the learner explicitly stated this "
+        "turn (e.g. 'shorter responses', 'don't translate every word', 'speak "
+        "slower', 'always quiz me', 'stop doing X'). Require an explicit "
+        "statement — never infer from neutral remarks."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "preference": {
+                "type": "string",
+                "description": "One short imperative sentence capturing the rule.",
+            },
+        },
+        "required": ["preference"],
+    },
+}
+
+REMEMBER_MISTAKE_TOOL = {
+    "name": "remember_mistake",
+    "description": (
+        "Record a notable learner error along with the correction so it can be "
+        "reinforced next session. Substantive grammar/usage issues only — skip "
+        "minor slips."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "description": {"type": "string", "description": "What the learner said or got wrong."},
+            "correction": {"type": "string", "description": "The right form plus a brief why."},
+        },
+        "required": ["description", "correction"],
+    },
+}
+
+CHAT_TOOLS = [SET_LANGUAGE_TOOL]
+EXTRACTION_TOOLS = [
+    REMEMBER_VOCAB_TOOL,
+    REMEMBER_PREFERENCE_TOOL,
+    REMEMBER_MISTAKE_TOOL,
+]
+
+EXTRACTOR_SYSTEM_PROMPT = """You analyze a single just-completed turn of a language-tutor conversation and extract memory updates by calling tools.
+
+Call zero or more of these tools, each at most once per turn:
+- remember_vocabulary: when the tutor introduced new words/phrases worth retaining. Skip words used only in passing.
+- remember_preference: when the learner explicitly stated a teaching-style preference. Require an explicit statement — never infer.
+- remember_mistake: when the tutor corrected a substantive learner error. Skip minor slips.
+
+If nothing notable happened, call no tools. Do not produce any conversational text — your output is not shown to the learner."""
+
 
 @dataclass
 class Session:
     target_language_code: str = "es"
     target_language_name: str = "Spanish"
     messages: list = field(default_factory=list)
+    memory: dict = field(default_factory=dict)
+    system_prompt: str = SYSTEM_PROMPT_BASE
 
 
 def record_until_silence() -> np.ndarray:
@@ -264,60 +436,157 @@ def speak(eleven_client: ElevenLabs, text: str, voice_id: str) -> None:
     sd.wait()
 
 
-def chat(claude: anthropic.Anthropic, session: Session, user_text: str) -> str:
-    """Run one user turn. Handle set_target_language tool calls. Return spoken reply."""
+def chat(
+    claude: anthropic.Anthropic, session: Session, user_text: str
+) -> Iterator[str]:
+    """Stream one user turn, yielding each completed sentence as it arrives.
+
+    Handles set_target_language tool calls between yields. The caller reads
+    `session.target_language_code` after each yield to pick the right TTS voice
+    — that value reflects the language the just-yielded sentence was generated
+    in, since tool-use processing only happens after a stream's final flush.
+    """
     mode_note = f"[Mode: target language is {session.target_language_name}.] "
     session.messages.append({"role": "user", "content": mode_note + user_text})
 
     while True:
-        response = claude.messages.create(
+        buffer = ""
+        with claude.messages.stream(
             model=CLAUDE_MODEL,
             max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            tools=[SET_LANGUAGE_TOOL],
+            system=session.system_prompt,
+            tools=CHAT_TOOLS,
             messages=session.messages,
-        )
-        session.messages.append({"role": "assistant", "content": response.content})
+        ) as stream:
+            for chunk in stream.text_stream:
+                buffer += chunk
+                while True:
+                    sentence, buffer = _split_sentence(buffer)
+                    if sentence is None:
+                        break
+                    yield sentence
+            if buffer.strip():
+                yield buffer.strip()
+            final_message = stream.get_final_message()
 
-        if response.stop_reason != "tool_use":
-            return "".join(b.text for b in response.content if b.type == "text").strip()
+        session.messages.append({"role": "assistant", "content": final_message.content})
+
+        if final_message.stop_reason != "tool_use":
+            return
 
         tool_results = []
-        for block in response.content:
-            if block.type != "tool_use" or block.name != "set_target_language":
+        for block in final_message.content:
+            if block.type != "tool_use":
                 continue
-            code = (block.input.get("language_code") or "").lower()
-            requested_name = block.input.get("language_name") or ""
-            if code not in SUPPORTED_LANGUAGES:
-                code = NAME_TO_CODE.get(requested_name.strip().lower(), "")
-            if code in SUPPORTED_LANGUAGES:
-                name = SUPPORTED_LANGUAGES[code]
-                session.target_language_code = code
-                session.target_language_name = name
-                print(f"\U0001f310  switched to {name} ({code})", flush=True)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": f"Target language is now {name}. Continue the conversation in {name}.",
-                })
+            if block.name == "set_target_language":
+                tool_results.append(_handle_set_language(session, block))
             else:
-                print(
-                    f"⚠️  ignored switch to '{requested_name or code}' "
-                    f"(not supported); staying in {session.target_language_name}",
-                    flush=True,
-                )
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
                     "is_error": True,
-                    "content": (
-                        f"'{requested_name or code}' is not a supported language. "
-                        f"Supported languages are: {SUPPORTED_LIST}. "
-                        f"This is likely a speech-to-text mishearing. "
-                        f"Stay in {session.target_language_name} and ask the learner to repeat."
-                    ),
+                    "content": f"Unknown tool: {block.name}",
                 })
         session.messages.append({"role": "user", "content": tool_results})
+
+
+def _handle_set_language(session: Session, block) -> dict:
+    code = (block.input.get("language_code") or "").lower()
+    requested_name = block.input.get("language_name") or ""
+    if code not in SUPPORTED_LANGUAGES:
+        code = NAME_TO_CODE.get(requested_name.strip().lower(), "")
+    if code in SUPPORTED_LANGUAGES:
+        name = SUPPORTED_LANGUAGES[code]
+        session.target_language_code = code
+        session.target_language_name = name
+        print(f"\U0001f310  switched to {name} ({code})", flush=True)
+        return {
+            "type": "tool_result",
+            "tool_use_id": block.id,
+            "content": f"Target language is now {name}. Continue the conversation in {name}.",
+        }
+    print(
+        f"⚠️  ignored switch to '{requested_name or code}' "
+        f"(not supported); staying in {session.target_language_name}",
+        flush=True,
+    )
+    return {
+        "type": "tool_result",
+        "tool_use_id": block.id,
+        "is_error": True,
+        "content": (
+            f"'{requested_name or code}' is not a supported language. "
+            f"Supported languages are: {SUPPORTED_LIST}. "
+            f"This is likely a speech-to-text mishearing. "
+            f"Stay in {session.target_language_name} and ask the learner to repeat."
+        ),
+    }
+
+
+def extract_memory(
+    claude: anthropic.Anthropic,
+    session: Session,
+    user_text: str,
+    assistant_text: str,
+) -> None:
+    """Run a separate Haiku call to pull vocab/preference/mistake updates from
+    the just-completed turn and persist them. Failures are non-fatal — memory
+    is best-effort, not load-bearing for the conversation."""
+    turn = (
+        f"Target language: {session.target_language_name}\n"
+        f"Learner: {user_text}\n"
+        f"Tutor: {assistant_text}"
+    )
+    try:
+        response = claude.messages.create(
+            model=EXTRACTOR_MODEL,
+            max_tokens=512,
+            system=EXTRACTOR_SYSTEM_PROMPT,
+            tools=EXTRACTION_TOOLS,
+            messages=[{"role": "user", "content": turn}],
+        )
+    except Exception as e:  # noqa: BLE001 — boundary call, log and skip
+        print(f"⚠️  memory extraction failed: {e}", file=sys.stderr)
+        return
+
+    code = session.target_language_code
+    changed = False
+    for block in response.content:
+        if block.type != "tool_use":
+            continue
+        if block.name == "remember_vocabulary":
+            slot = memory_slot(session.memory, code)
+            added = []
+            for w in (block.input.get("words") or []):
+                word = (w.get("word") or "").strip()
+                if not word:
+                    continue
+                entry = {"word": word, "translation": (w.get("translation") or "").strip()}
+                note = (w.get("note") or "").strip()
+                if note:
+                    entry["note"] = note
+                slot["vocab"].append(entry)
+                added.append(word)
+            if added:
+                print(f"[memory] vocab [{code}]: {', '.join(added)}", flush=True)
+                changed = True
+        elif block.name == "remember_preference":
+            pref = (block.input.get("preference") or "").strip()
+            if pref:
+                slot = memory_slot(session.memory, code)
+                slot["preferences"].append(pref)
+                print(f"[memory] preference [{code}]: {pref}", flush=True)
+                changed = True
+        elif block.name == "remember_mistake":
+            desc = (block.input.get("description") or "").strip()
+            corr = (block.input.get("correction") or "").strip()
+            if desc and corr:
+                slot = memory_slot(session.memory, code)
+                slot["mistakes"].append({"description": desc, "correction": corr})
+                print(f"[memory] correction [{code}]: {desc} → {corr}", flush=True)
+                changed = True
+    if changed:
+        save_memory(session.memory)
 
 
 def main() -> None:
@@ -329,10 +598,14 @@ def main() -> None:
     claude = anthropic.Anthropic()
     openai_client = OpenAI()
     eleven = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
-    session = Session()
+
+    memory = load_memory()
+    session = Session(memory=memory, system_prompt=build_system_prompt(memory))
 
     print("AI Language Professor. Ctrl-C to quit.", flush=True)
-    print_all_voices(eleven)
+    if memory:
+        langs = ", ".join(SUPPORTED_LANGUAGES.get(c, c) for c in sorted(memory.keys()))
+        print(f"loaded memory for: {langs}", flush=True)
     print(f"\nStarting in {session.target_language_name}. "
           f"Supported: {SUPPORTED_LIST}. "
           "Say 'let's switch to <language>' anytime.\n", flush=True)
@@ -352,13 +625,18 @@ def main() -> None:
                 continue
             print(f"you [{detected}]: {text}", flush=True)
 
-            reply = chat(claude, session, text)
-            if not reply:
-                print("(no reply)\n", flush=True)
-                continue
-            voice_id = VOICE_MAP.get(session.target_language_code, DEFAULT_VOICE_ID)
-            print(f"tutor [{session.target_language_code}]: {reply}\n", flush=True)
-            speak(eleven, reply, voice_id)
+            assistant_sentences: list[str] = []
+            for sentence in chat(claude, session, text):
+                lang = session.target_language_code
+                print(f"tutor [{lang}]: {sentence}", flush=True)
+                voice_id = VOICE_MAP.get(lang, DEFAULT_VOICE_ID)
+                speak(eleven, sentence, voice_id)
+                assistant_sentences.append(sentence)
+            if not assistant_sentences:
+                print("(no reply)", flush=True)
+            else:
+                extract_memory(claude, session, text, " ".join(assistant_sentences))
+            print(flush=True)
 
     except KeyboardInterrupt:
         print("\ngoodbye.", flush=True)

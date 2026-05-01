@@ -1,0 +1,41 @@
+{
+  "es": {
+    "vocab": [],
+    "mistakes": [
+      {
+        "description": "Dijo \"practicar un poquito de español para ahora\"",
+        "correction": "Lo correcto es \"por ahora\" o simplemente \"ahora\". \"Por\" expresa duración/momento temporal; \"para\" indica destino o propósito."
+      },
+      {
+        "description": "Uso excesivo del pronombre \"yo\" en cada oración (\"yo hice\", \"yo trabajo\", \"yo tengo\", \"yo quiero\")",
+        "correction": "En español el pronombre sujeto suele omitirse porque la conjugación del verbo ya indica la persona. Solo se usa \"yo\" para enfatizar o contrastar."
+      },
+      {
+        "description": "Dijo \"yo quiero especializar\" y \"las sistemas\"",
+        "correction": "\"Especializarse\" es reflexivo: \"quiero especializarme en...\". Y \"sistema\" es masculino (el sistema, los sistemas) a pesar de terminar en -a, porque viene del griego, como \"problema\", \"tema\", \"programa\"."
+      }
+    ],
+    "preferences": []
+  },
+  "ru": {
+    "vocab": [
+      {
+        "word": "из",
+        "translation": "from (requires genitive case)"
+      },
+      {
+        "word": "откуда",
+        "translation": "where from"
+      },
+      {
+        "word": "Я из Нью-Йорка",
+        "translation": "I'm from New York",
+        "note": "Demonstrates genitive after из"
+      }
+    ],
+    "mistakes": [],
+    "preferences": [
+      "Translate most Russian phrases into English in parentheses, since the learner is a beginner in Russian."
+    ]
+  }
+}
