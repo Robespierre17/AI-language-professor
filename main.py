@@ -80,84 +80,36 @@ def looks_like_switch_request(text: str) -> bool:
     return any(phrase in lowered for phrase in SWITCH_PHRASE_HINTS)
 
 
-# Search terms used to score voices per language. Includes the English name,
-# the endonym, and accent labels likely to appear in ElevenLabs voice metadata.
-LANGUAGE_VOICE_ALIASES = {
-    "es": ("spanish", "español", "castilian", "castellano"),
-    "fr": ("french", "français", "francais", "parisian"),
-    "he": ("hebrew", "ivrit", "israeli"),
-    "ru": ("russian", "русский"),
-    "ja": ("japanese", "日本", "nihongo"),
-    "fa": ("persian", "farsi", "iranian"),
-    "ar": ("arabic", "عربي", "egyptian", "levantine", "gulf"),
-    "sv": ("swedish", "svenska", "svensk"),
-}
-
-
-def _voice_haystack(voice) -> str:
-    labels = getattr(voice, "labels", None) or {}
-    parts = [
-        getattr(voice, "name", "") or "",
-        getattr(voice, "description", "") or "",
-        labels.get("language", "") or "",
-        labels.get("accent", "") or "",
-        labels.get("description", "") or "",
-        labels.get("descriptive", "") or "",
-        labels.get("use_case", "") or "",
-    ]
-    return " ".join(str(p) for p in parts).lower()
-
-
-def build_voice_map(eleven_client: ElevenLabs) -> dict[str, str]:
-    """Pick the best native-accent voice in the user's library per language.
-
-    Returns {code: voice_id}. Languages with no clear match are omitted, and the
-    caller falls back to DEFAULT_VOICE_ID (the multilingual generic).
-    """
+def print_all_voices(eleven_client: ElevenLabs) -> None:
+    """Dump every available ElevenLabs voice with full metadata."""
     try:
         voices = list(eleven_client.voices.get_all().voices)
-    except Exception as e:  # noqa: BLE001 — boundary call, surface and fall back
+    except Exception as e:  # noqa: BLE001 — boundary call, surface and continue
         print(f"⚠️  could not list ElevenLabs voices: {e}", file=sys.stderr)
-        return {}
+        return
 
-    voice_map: dict[str, str] = {}
-    for code, terms in LANGUAGE_VOICE_ALIASES.items():
-        best = None
-        best_score = 0
-        for v in voices:
-            if v.voice_id == DEFAULT_VOICE_ID:
-                continue  # the generic multilingual fallback — never preferred
-            haystack = _voice_haystack(v)
-            score = sum(10 for term in terms if term in haystack)
-            if score == 0:
-                continue
-            if "multilingual" in haystack:
-                score -= 8
-            category = getattr(v, "category", "") or ""
-            if category == "premade":
-                score += 2
-            elif category == "professional":
-                score += 1
-            if score > best_score:
-                best_score = score
-                best = v
-        if best and best_score >= 10:
-            voice_map[code] = best.voice_id
-            print(
-                f"\U0001f50a  {SUPPORTED_LANGUAGES[code]}: {best.name} "
-                f"({best.voice_id})",
-                flush=True,
-            )
-        else:
-            print(
-                f"\U0001f50a  {SUPPORTED_LANGUAGES[code]}: no native voice in "
-                f"library, falling back to default",
-                flush=True,
-            )
-    return voice_map
+    print(f"\n=== {len(voices)} ElevenLabs voices ===\n", flush=True)
+    for v in voices:
+        print(f"id:          {getattr(v, 'voice_id', '')}")
+        print(f"name:        {getattr(v, 'name', '')}")
+        print(f"category:    {getattr(v, 'category', '')}")
+        print(f"labels:      {getattr(v, 'labels', None)}")
+        print(f"description: {getattr(v, 'description', '')}")
+        print(flush=True)
 
 
-VOICE_MAP: dict[str, str] = {}
+# Hardcoded voice IDs per language. Fill in after reading the voice dump
+# printed at startup. Languages left out fall back to DEFAULT_VOICE_ID.
+VOICE_MAP: dict[str, str] = {
+    # "es": "",
+    # "fr": "",
+    # "he": "",
+    # "ru": "",
+    # "ja": "",
+    # "fa": "",
+    # "ar": "",
+    # "sv": "",
+}
 
 SYSTEM_PROMPT = f"""You are an adaptive language tutor in a real-time spoken conversation with a learner.
 
@@ -380,8 +332,7 @@ def main() -> None:
     session = Session()
 
     print("AI Language Professor. Ctrl-C to quit.", flush=True)
-    print("Discovering ElevenLabs voices...", flush=True)
-    VOICE_MAP.update(build_voice_map(eleven))
+    print_all_voices(eleven)
     print(f"\nStarting in {session.target_language_name}. "
           f"Supported: {SUPPORTED_LIST}. "
           "Say 'let's switch to <language>' anytime.\n", flush=True)
