@@ -1,6 +1,65 @@
 {
   "es": {
-    "vocab": [],
+    "vocab": [
+      {
+        "word": "coger",
+        "translation": "to take, grab, seize (Spain: standard; Latin America: vulgar slang—avoid)",
+        "note": "In Spain, 'coger' is neutral and common. In most of Latin America, it has offensive connotations. Better alternatives: 'tomar', 'agarrar', 'tomar prestado' (to borrow)."
+      },
+      {
+        "word": "tomar",
+        "translation": "to take, drink, grab"
+      },
+      {
+        "word": "agarrar",
+        "translation": "to grab, seize, catch"
+      },
+      {
+        "word": "coger",
+        "translation": "to take, to grab (but has vulgar sexual meaning in Latin America)",
+        "note": "In Mexico, Argentina, and other Latin American countries, 'coger' has a crude sexual meaning. Safer alternatives are 'tomar' or 'agarrar'."
+      },
+      {
+        "word": "tomar el autobús",
+        "translation": "to take the bus",
+        "note": "Preferred form in Latin America instead of 'coger el autobús'."
+      },
+      {
+        "word": "agarrar",
+        "translation": "to grab, to take",
+        "note": "Safe alternative to 'coger' in all Spanish-speaking regions."
+      },
+      {
+        "word": "coger",
+        "translation": "to take / to grab (Spain); vulgar/sexual meaning in Latin America",
+        "note": "In Spain: normal usage (coger el metro = take the metro). In Latin America: offensive/vulgar. Use 'tomar' or 'agarrar' instead to avoid confusion."
+      },
+      {
+        "word": "tomar",
+        "translation": "to take",
+        "note": "Neutral alternative to 'coger' in Latin America (tomar el metro = take the metro)."
+      },
+      {
+        "word": "agarrar",
+        "translation": "to grab / to take",
+        "note": "Neutral alternative to 'coger' in Latin America."
+      },
+      {
+        "word": "¿Tiene sentido?",
+        "translation": "Does it make sense?",
+        "note": "Common phrase to check understanding"
+      },
+      {
+        "word": "¿Está claro?",
+        "translation": "Is it clear?",
+        "note": "Alternative way to verify understanding"
+      },
+      {
+        "word": "¿Me explico?",
+        "translation": "Do I explain myself? / Am I making myself clear?",
+        "note": "Alternative way to ask if someone understands"
+      }
+    ],
     "mistakes": [
       {
         "description": "Dijo \"practicar un poquito de español para ahora\"",
@@ -31,6 +90,30 @@
         "word": "Я из Нью-Йорка",
         "translation": "I'm from New York",
         "note": "Demonstrates genitive after из"
+      },
+      {
+        "word": "Отлично",
+        "translation": "Excellent"
+      },
+      {
+        "word": "Привет",
+        "translation": "Hello"
+      },
+      {
+        "word": "Как дела?",
+        "translation": "How are you?"
+      },
+      {
+        "word": "хорошее слово",
+        "translation": "good word"
+      },
+      {
+        "word": "давай практиковать",
+        "translation": "let's practice"
+      },
+      {
+        "word": "что-нибудь",
+        "translation": "something"
       }
     ],
     "mistakes": [],
