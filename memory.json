@@ -72,6 +72,14 @@
       {
         "description": "Dijo \"yo quiero especializar\" y \"las sistemas\"",
         "correction": "\"Especializarse\" es reflexivo: \"quiero especializarme en...\". Y \"sistema\" es masculino (el sistema, los sistemas) a pesar de terminar en -a, porque viene del griego, como \"problema\", \"tema\", \"programa\"."
+      },
+      {
+        "description": "Learner said \"Yo voy a empezar con...\" when the pronoun was unnecessary.",
+        "correction": "In Spanish, subject pronouns (yo, tú, etc.) are usually omitted because the verb ending already indicates who is performing the action. Say \"voy a empezar con...\" instead of \"yo voy a empezar con...\""
+      },
+      {
+        "description": "Learner used \"donde vivo\" when the tutor had asked \"donde vives\" — failing to adjust the verb form to match the question's perspective (tú vs. yo).",
+        "correction": "When answering a question asked in tú form, switch the verb conjugation to match your response perspective. If asked \"¿dónde vives?\" answer \"vivo\"; if asked \"¿qué haces?\" answer \"hago\" — not repeating the tú conjugation from the question."
       }
     ],
     "preferences": []
@@ -120,5 +128,36 @@
     "preferences": [
       "Translate most Russian phrases into English in parentheses, since the learner is a beginner in Russian."
     ]
+  },
+  "he": {
+    "vocab": [
+      {
+        "word": "שלום",
+        "translation": "Hello, goodbye, peace"
+      },
+      {
+        "word": "מה שלומך",
+        "translation": "How are you? (masculine singular)",
+        "note": "Also מה שלומך (shlomech for feminine singular). Formal way to ask how someone is."
+      },
+      {
+        "word": "שלום טוב",
+        "translation": "I'm well / good"
+      },
+      {
+        "word": "תודה",
+        "translation": "thanks"
+      },
+      {
+        "word": "ואתה",
+        "translation": "and you"
+      },
+      {
+        "word": "מה שלומך",
+        "translation": "how are you? (masc.)"
+      }
+    ],
+    "mistakes": [],
+    "preferences": []
   }
 }

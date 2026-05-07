@@ -30,8 +30,8 @@ load_dotenv()
 
 SAMPLE_RATE = 16_000
 CHANNELS = 1
-SILENCE_RMS = 250           # int16 RMS below this counts as silence
-SILENCE_DURATION = 1.5      # seconds of silence after speech that ends a turn
+SILENCE_RMS = 350           # int16 RMS below this counts as silence
+SILENCE_DURATION = 0.8      # seconds of silence after speech that ends a turn
 MIN_SPEECH_DURATION = 0.4   # ignore silence until this much speech is heard
 MAX_TURN_SECONDS = 60
 
@@ -430,7 +430,7 @@ def speak(eleven_client: ElevenLabs, text: str, voice_id: str) -> None:
         voice_id=voice_id,
         model_id=TTS_MODEL,
         text=text,
-        voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.9, style=0.0),
+        voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.75, style=0.0),
         output_format="pcm_24000",
     )
     pcm = b"".join(audio_iter)

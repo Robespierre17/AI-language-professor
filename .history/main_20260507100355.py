@@ -430,7 +430,7 @@ def speak(eleven_client: ElevenLabs, text: str, voice_id: str) -> None:
         voice_id=voice_id,
         model_id=TTS_MODEL,
         text=text,
-        voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.9, style=0.0),
+        voice_settings=VoiceSettings(stability=0.5, similarity_boost=0.75, style=0.0),
         output_format="pcm_24000",
     )
     pcm = b"".join(audio_iter)
