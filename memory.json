@@ -159,5 +159,159 @@
     ],
     "mistakes": [],
     "preferences": []
+  },
+  "sv": {
+    "vocab": [
+      {
+        "word": "Hej",
+        "translation": "Hello/Hi"
+      },
+      {
+        "word": "Välkommen",
+        "translation": "Welcome"
+      },
+      {
+        "word": "till",
+        "translation": "to"
+      },
+      {
+        "word": "svenskan",
+        "translation": "Swedish (the language)"
+      },
+      {
+        "word": "Hur mår du?",
+        "translation": "How are you?",
+        "note": "Common greeting question in Swedish"
+      },
+      {
+        "word": "Hej igen",
+        "translation": "Hi again"
+      },
+      {
+        "word": "Nu pratar vi svenska",
+        "translation": "Now we speak Swedish"
+      },
+      {
+        "word": "Hur mår du idag?",
+        "translation": "How are you today?"
+      },
+      {
+        "word": "mår bra",
+        "translation": "doing well, feeling good",
+        "note": "Used to express how you feel: Jag mår bra = I'm doing well."
+      },
+      {
+        "word": "mår",
+        "translation": "feel, am (in expressions of health/wellbeing)",
+        "note": "From 'hur mår du?' (how are you?); 'jag mår bra' (I'm well)"
+      },
+      {
+        "word": "tack",
+        "translation": "thank you; thanks",
+        "note": "Also used as 'tack för att du frågar' (thanks for asking)"
+      },
+      {
+        "word": "var bor du",
+        "translation": "where do you live",
+        "note": "bor = live/reside"
+      },
+      {
+        "word": "fortfarande",
+        "translation": "still; yet",
+        "note": "i New York fortfarande = still in New York"
+      },
+      {
+        "word": "någon annanstans",
+        "translation": "somewhere else; elsewhere",
+        "note": "någon = some/any; annanstans = elsewhere"
+      },
+      {
+        "word": "Jag vet inte",
+        "translation": "I don't know"
+      },
+      {
+        "word": "Var bor du?",
+        "translation": "Where do you live?",
+        "note": "Common question asking about someone's residence"
+      },
+      {
+        "word": "Jag bor i",
+        "translation": "I live in",
+        "note": "Used to state where you live, followed by a place name"
+      },
+      {
+        "word": "arbetar",
+        "translation": "work",
+        "note": "First person singular present tense of 'arbeta'"
+      },
+      {
+        "word": "studerar",
+        "translation": "study",
+        "note": "First person singular present tense of 'studera'"
+      },
+      {
+        "word": "Vad gör du",
+        "translation": "What do you do",
+        "note": "Common question phrase"
+      },
+      {
+        "word": "jobba",
+        "translation": "to work",
+        "note": "Alternative to 'arbetar'; more colloquial"
+      },
+      {
+        "word": "inom",
+        "translation": "within; in the field of",
+        "note": "Used in 'jobba inom teknologi' – within/in the field of technology"
+      },
+      {
+        "word": "med",
+        "translation": "with",
+        "note": "Used in 'jobba med teknik' – work with technology"
+      },
+      {
+        "word": "programmering",
+        "translation": "programming",
+        "note": "att skriva kod (writing code)"
+      },
+      {
+        "word": "datorer",
+        "translation": "computers"
+      },
+      {
+        "word": "något annat",
+        "translation": "something else"
+      },
+      {
+        "word": "programmeringsspråk",
+        "translation": "programming language"
+      },
+      {
+        "word": "Vilket programmeringsspråk använder du?",
+        "translation": "What programming language do you use?",
+        "note": "Question structure useful for language discussion"
+      },
+      {
+        "word": "Jag använder...",
+        "translation": "I use...",
+        "note": "Standard way to express what you use in Swedish"
+      },
+      {
+        "word": "Jag programmerar i...",
+        "translation": "I program in...",
+        "note": "Alternative phrasing specific to programming languages"
+      }
+    ],
+    "mistakes": [
+      {
+        "description": "Learner said \"För du i dag\" instead of a complete phrase like \"Hur mår du?\" (How are you?)",
+        "correction": "\"Hur mår du?\" (How are you?) — \"För\" means \"for\" and doesn't work as an opening greeting. The correct phrase for asking how someone is uses \"Hur mår du?\" (literally: How feels you?)"
+      },
+      {
+        "description": "Learner said \"Jag är god\" (I am good) for expressing how they feel.",
+        "correction": "\"Jag mår bra\" is the correct way to say \"I'm doing well\" or \"I feel good.\" \"Mår\" (from \"må\") is used for how you feel; \"god\" (good) is mainly for food, things, or describing someone as kind."
+      }
+    ],
+    "preferences": []
   }
 }

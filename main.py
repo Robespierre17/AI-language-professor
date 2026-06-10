@@ -610,20 +610,30 @@ def main() -> None:
                 print("(too short)\n", flush=True)
                 continue
 
+            import time
+            t0 = time.time()
             text, detected = transcribe(
                 openai_client, audio, session.target_language_code
             )
+            print(f"[timing] transcribe: {time.time()-t0:.1f}s", flush=True)
             if not text:
                 print("(silence)\n", flush=True)
                 continue
             print(f"you [{detected}]: {text}", flush=True)
 
             assistant_sentences: list[str] = []
+            t1 = time.time()
+            first_sentence = True
             for sentence in chat(claude, session, text):
+                if first_sentence:
+                    print(f"[timing] first sentence from claude: {time.time()-t1:.1f}s", flush=True)
+                    first_sentence = False
                 lang = session.target_language_code
                 print(f"tutor [{lang}]: {sentence}", flush=True)
                 voice_id = VOICE_MAP.get(lang, DEFAULT_VOICE_ID)
+                t2 = time.time()
                 speak(eleven, sentence, voice_id)
+                print(f"[timing] speak: {time.time()-t2:.1f}s", flush=True)
                 assistant_sentences.append(sentence)
             if not assistant_sentences:
                 print("(no reply)", flush=True)
